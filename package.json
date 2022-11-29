@@ -12,6 +12,7 @@
   "categories": [
     "Other"
   ],
+  "publisher": "garlicbreadcleric",
   "activationEvents": [
     "onCommand:documentPreview.openDocumentPreview"
   ],
