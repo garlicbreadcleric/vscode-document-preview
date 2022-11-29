@@ -1,5 +1,7 @@
 # Document Preview
 
+![](./icon.png)
+
 Configurable VS Code preview extension for HTML, Markdown, reStructuredText and more.
 
 ## Motivation
