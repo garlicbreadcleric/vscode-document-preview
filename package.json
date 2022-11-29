@@ -1,0 +1,146 @@
+{
+  "name": "document-preview",
+  "displayName": "Document Preview",
+  "description": "Configurable preview for HTML, Markdown, reStructuredText and more.",
+  "repository": {"url": "https://github.com/garlicbreadcleric/vscode-document-preview"},
+  "license": "MIT",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:documentPreview.openDocumentPreview"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "documentPreview.openDocumentPreview",
+        "title": "Open Document Preview"
+      }
+    ],
+    "configuration": {
+      "title": "Document Preview",
+      "properties": {
+        "documentPreview.theme": {
+          "title": "Preview theme",
+          "type": "string",
+          "default": "none",
+          "enum": [
+            "none",
+            "default-dark",
+            "default-light"
+          ]
+        },
+        "documentPreview.customCssPath": {
+          "title": "Custom CSS path",
+          "type": "string"
+        },
+        "documentPreview.highlightTheme": {
+          "title": "Syntax highlight theme",
+          "type": "string",
+          "default": "monochrome",
+          "enum": [
+            "pygments",
+            "tango",
+            "espresso",
+            "zenburn",
+            "kate",
+            "monochrome",
+            "breezedark",
+            "haddock"
+          ]
+        },
+        "documentPreview.converters": {
+          "title": "Converters",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "title": "Converter name",
+                "type": "string"
+              },
+              "tags": {
+                "title": "Converter tags",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "fileTypes": {
+                "title": "Document file types (e.g. markdown)",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "regex": {
+                "title": "RegEx to match file name",
+                "type": "string"
+              },
+              "command": {
+                "title": "CLI command to convert file",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "documentPreview.previewFeatures.mermaid": {
+          "title": "Mermaid",
+          "description": "Enable Mermaid",
+          "type": "boolean"
+        },
+        "documentPreview.previewFeatures.katex": {
+          "title": "KaTeX",
+          "description": "Enable KaTeX",
+          "type": "boolean"
+        },
+        "documentPreview.previewFeatures.glightbox": {
+          "title": "GLightBox",
+          "description": "Enable GLightBox",
+          "type": "boolean"
+        },
+        "documentPreview.previewFeatures.fontAwesome": {
+          "title": "FontAwesome",
+          "description": "Enable FontAwesome",
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/glob": "^7.2.0",
+    "@types/mocha": "^9.1.1",
+    "@types/node": "16.x",
+    "@types/sanitize-html": "^2.6.2",
+    "@types/vscode": "^1.70.0",
+    "@typescript-eslint/eslint-plugin": "^5.31.0",
+    "@typescript-eslint/parser": "^5.31.0",
+    "@vscode/test-electron": "^2.1.5",
+    "eslint": "^8.20.0",
+    "glob": "^8.0.3",
+    "mocha": "^10.0.0",
+    "typescript": "^4.7.4"
+  },
+  "dependencies": {
+    "@highlightjs/cdn-assets": "^11.6.0",
+    "async-mutex": "^0.4.0",
+    "glightbox": "^3.2.0",
+    "katex": "^0.16.2",
+    "mermaid": "^9.1.6",
+    "open": "^8.4.0",
+    "sanitize-html": "^2.7.1"
+  }
+}
