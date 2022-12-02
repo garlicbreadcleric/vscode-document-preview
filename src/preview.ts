@@ -1,7 +1,9 @@
-import { Mutex } from "async-mutex";
 import * as path from "path";
 
+import { Mutex } from "async-mutex";
+import * as open from "open";
 import * as vscode from "vscode";
+
 import { convert } from "./convert";
 
 export type PreviewResources = {
@@ -72,6 +74,29 @@ export class PreviewPanel implements vscode.Disposable {
         if (activeEditor) {
             this.render(activeEditor.document);
         }
+
+        this.panel.webview.onDidReceiveMessage(message => {
+            console.log(JSON.stringify(message));
+            switch (message.command) {
+                case 'click-link': {
+                    const {href, fileUri} = message;
+                    if (href.match(/^[a-z]+:\/\//)) {
+                        open(href);
+                    } else {
+                        const previousEditor = vscode.window.visibleTextEditors.find(e => e.document.uri.toString() === fileUri);
+                        const viewColumn = previousEditor?.viewColumn || vscode.ViewColumn.Beside;
+                        
+                        vscode.window.showTextDocument(
+                            vscode.Uri.parse(
+                                path.join(path.dirname(fileUri), href)
+                            ),
+                            {viewColumn}
+                        );
+                    }
+                    return;
+                }
+            }
+        });
     }
 
     async init() {

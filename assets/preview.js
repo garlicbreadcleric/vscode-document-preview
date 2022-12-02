@@ -138,32 +138,6 @@ function setup() {
     }
 }
 
-// document.addEventListener("DOMContentLoaded", () => {
-//     const metaElement = document.querySelector('meta[name="documentPreview-input"]');
-//     let _meta = null;
-//     if (metaElement) {
-//         _meta = JSON.parse(atob(metaElement.getAttribute("content")));
-//         window._meta = _meta;
-//     }
-
-//     console.log(_meta);
-    
-//     decodeLinkURIs();
-//     if (_meta?.features?.fontAwesome) {
-//         addLinkClasses();
-//         replaceCheckboxes();
-//     }
-//     if (_meta?.features?.glightbox) {
-//         setupGlightbox();
-//     }
-//     if (_meta?.features?.mermaid) {
-//         setupMermaid();
-//     }
-//     if (_meta?.features?.katex) {
-//         setupKatex();
-//     }
-// });
-
 document.addEventListener("click", (event) => {
     if (!event?.view?.document) {
         return;
@@ -184,7 +158,7 @@ document.addEventListener("click", (event) => {
                     el.scrollIntoView();
                 }
             } else {
-                vscode.postMessage({ command: 'click-link', href, filePath: window._meta.fileUri.fsPath });
+                vscode.postMessage({ command: 'click-link', href, fileUri: currentUri });
             }
             event.preventDefault();
             event.stopPropagation();
