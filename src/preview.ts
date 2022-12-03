@@ -180,12 +180,13 @@ export class PreviewPanel implements vscode.Disposable {
 
     protected getConverter(document: vscode.TextDocument): any | null {
         for (const converter of this.config.converters) {
-            // if (converter.regex != null && filePath.match(converter.regex)) {
-            //     return converter;
-            // }
-            if (converter.fileTypes != null && converter.fileTypes.includes(document.languageId)) {
-                return converter;
+            if (converter.regex != null && !document.fileName.match(converter.regex)) {
+                continue;
             }
+            if (converter.fileTypes != null && !converter.fileTypes.includes(document.languageId)) {
+                continue;
+            }
+            return converter;
         }
         return null;
     }
