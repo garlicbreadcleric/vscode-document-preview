@@ -4,7 +4,7 @@
   "description": "Configurable preview for HTML, Markdown, reStructuredText and more.",
   "repository": {"url": "https://github.com/garlicbreadcleric/vscode-document-preview"},
   "license": "MIT",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.70.0"
