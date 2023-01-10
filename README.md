@@ -61,3 +61,8 @@ If you happen to find this extension useful enough and want to help improve it, 
 - Report bugs
 - Propose features
 - Contribute general themes and code highlighting themes
+
+## See also
+
+- Markane ([language server](https://github.com/garlicbreadcleric/markane) and [VSCode extension](https://github.com/garlicbreadcleric/vscode-markane)) for link completion, document templates, querying documents and more
+- [Pandoc Markdown Syntax] for VS Code
