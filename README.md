@@ -1,7 +1,5 @@
 # Document Preview
 
-![](./icon.png)
-
 [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=garlicbreadcleric.document-preview) |
 [Open VSX](https://open-vsx.org/extension/garlicbreadcleric/document-preview) |
 [GitHub](https://github.com/garlicbreadcleric/vscode-document-preview)
