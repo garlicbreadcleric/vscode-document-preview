@@ -65,4 +65,4 @@ If you happen to find this extension useful enough and want to help improve it, 
 ## See also
 
 - Markane ([language server](https://github.com/garlicbreadcleric/markane) and [VSCode extension](https://github.com/garlicbreadcleric/vscode-markane)) for link completion, document templates, querying documents and more
-- [Pandoc Markdown Syntax] for VS Code
+- [Pandoc Markdown Syntax](https://github.com/garlicbreadcleric/vscode-pandoc-markdown) for VS Code
