@@ -1,203 +1,184 @@
 import * as path from "path";
+import * as url from "url";
 
 import { Mutex } from "async-mutex";
+import { JSDOM } from "jsdom";
 import * as open from "open";
 import * as vscode from "vscode";
 
 import { convert } from "./convert";
 
-export type PreviewResources = {
-    customCssUri: vscode.Uri | null;
-
-    jsUri: vscode.Uri;
-    themeCssUri: vscode.Uri;
-    highlightThemeCssUri: vscode.Uri;
-
-    fontAwesomeBaseUri: vscode.Uri;
-    katexBaseUri: vscode.Uri;
-    glightboxBaseUri: vscode.Uri;
-    mermaidBaseUri: vscode.Uri;
-};
-
 export class PreviewPanel implements vscode.Disposable {
-    protected config: vscode.WorkspaceConfiguration;
-    protected isActive: boolean = true;
-    protected panel: vscode.WebviewPanel;
-    protected resources: PreviewResources;
+  protected isActive: boolean = true;
+  protected isRendered: boolean = false;
 
-    protected disposables: vscode.Disposable[] = [];
+  protected config: vscode.WorkspaceConfiguration;
+  protected panel: vscode.WebviewPanel;
 
-    protected converterMutex: Mutex = new Mutex();
-    protected isDirty: boolean = false;
-    protected lastConvertedAt: number = Date.now();
+  protected jsUri: vscode.Uri;
 
-    constructor(protected editor: vscode.TextEditor, protected context: vscode.ExtensionContext) {
-        this.config = vscode.workspace.getConfiguration('documentPreview');
+  protected disposables: vscode.Disposable[] = [];
 
-        const localResourceRoots: vscode.Uri[] = []; // TODO.
-        localResourceRoots.push(vscode.Uri.file(context.extensionPath));
-        vscode.workspace.workspaceFolders?.forEach(f => localResourceRoots.push(f.uri));
+  protected converterMutex: Mutex = new Mutex();
+  protected isDirty: boolean = false;
+  protected lastConvertedAt: number = Date.now();
 
-        if (this.config.customCssPath != null && this.config.customCssPath.trim() != "") {
-            localResourceRoots.push(vscode.Uri.file(path.dirname(this.config.customCssPath)))
+  constructor(protected editor: vscode.TextEditor, protected context: vscode.ExtensionContext) {
+    this.config = vscode.workspace.getConfiguration("documentPreview");
+
+    const localResourceRoots: vscode.Uri[] = []; // TODO.
+    localResourceRoots.push(vscode.Uri.file(context.extensionPath));
+    vscode.workspace.workspaceFolders?.forEach((f) => localResourceRoots.push(f.uri));
+
+    this.panel = vscode.window.createWebviewPanel("documentPreview", "Document Preview", vscode.ViewColumn.Beside, {
+      enableScripts: true,
+      localResourceRoots,
+    });
+
+    this.jsUri = this.makeLocalResourceUri("assets/preview.js");
+
+    vscode.window.onDidChangeActiveTextEditor((ev) => {
+      const editor = vscode.window.activeTextEditor;
+      if (editor) {
+        this.render(editor.document);
+      }
+    });
+
+    vscode.workspace.onDidChangeTextDocument(
+      (ev) => {
+        this.render(ev.document);
+      },
+      null,
+      this.disposables
+    );
+
+    const activeEditor = vscode.window.activeTextEditor;
+    if (activeEditor) {
+      this.render(activeEditor.document);
+    }
+
+    this.panel.webview.onDidReceiveMessage((message) => {
+      switch (message.command) {
+        case "link-click": {
+          const { href, fileUri } = message;
+          if (href.match(/^[a-z]+:\/\//)) {
+            open(href);
+          } else {
+            const previousEditor = vscode.window.visibleTextEditors.find((e) => e.document.uri.toString() === fileUri);
+            const viewColumn = previousEditor?.viewColumn || vscode.ViewColumn.Beside;
+
+            vscode.window.showTextDocument(vscode.Uri.parse(path.join(path.dirname(fileUri), href)), { viewColumn });
+          }
+          return;
         }
-        this.panel = vscode.window.createWebviewPanel('documentPreview', 'Document Preview', vscode.ViewColumn.Beside, { enableScripts: true, localResourceRoots });
+      }
+    });
+  }
 
-        this.resources = {
-            customCssUri: null,
-            
-            jsUri: this.makeLocalResourceUri('assets/preview.js'),
-            themeCssUri: this.makeLocalResourceUri(`assets/themes/${this.config.theme}.css`),
-            highlightThemeCssUri: this.makeLocalResourceUri(`assets/highlight-themes/${this.config.highlightTheme}.css`),
+  async init() {
+    if (!this.isActive) return;
+  }
 
-            fontAwesomeBaseUri: this.makeLocalResourceUri('assets/fontawesome'),
-            katexBaseUri: this.makeNodeModulesResourceUri('katex/dist'),
-            glightboxBaseUri: this.makeNodeModulesResourceUri('glightbox/dist'),
-            mermaidBaseUri: this.makeNodeModulesResourceUri('mermaid/dist'),
-        };
-        if (this.config.customCssPath != null && this.config.customCssPath.trim() != "") {
-            this.resources.customCssUri = this.panel.webview.asWebviewUri(vscode.Uri.file(this.config.customCssPath));
-        }
-
-        vscode.window.onDidChangeActiveTextEditor(ev => {
-            const editor = vscode.window.activeTextEditor;
-            if (editor) {
-                this.render(editor.document);
-            }
+  async render(document: vscode.TextDocument) {
+    if (this.converterMutex.isLocked()) {
+      const now = Date.now();
+      this.isDirty = true;
+      setTimeout(() => {
+        if (this.isDirty && now > this.lastConvertedAt) this.render(document);
+      }, 500);
+      return;
+    }
+    this.converterMutex.runExclusive(async () => {
+      if (!this.isActive) return;
+      if (document.fileName != vscode.window.activeTextEditor?.document.fileName) return;
+      this.isDirty = false;
+      this.lastConvertedAt = Date.now();
+      const converter = this.getConverter(document);
+      if (converter == null || converter.command == null || converter.command.length === 0) return;
+      const baseUri = this.panel.webview.asWebviewUri(document.uri);
+      if (this.isRendered && converter.command.length > 1) {
+        const result = await convert({
+          command: converter.command[1],
+          filePath: document.uri.fsPath,
+          source: document.getText(),
         });
-
-        vscode.workspace.onDidChangeTextDocument(ev => {
-            this.render(ev.document);
-        }, null, this.disposables);
-
-        const activeEditor = vscode.window.activeTextEditor;
-        if (activeEditor) {
-            this.render(activeEditor.document);
+        if (result.status === "ok") {
+          this.renderHtmlBody(document.uri, baseUri, result.body);
+        } else {
+          console.error(result.message);
         }
-
-        this.panel.webview.onDidReceiveMessage(message => {
-            console.log(JSON.stringify(message));
-            switch (message.command) {
-                case 'click-link': {
-                    const {href, fileUri} = message;
-                    if (href.match(/^[a-z]+:\/\//)) {
-                        open(href);
-                    } else {
-                        const previousEditor = vscode.window.visibleTextEditors.find(e => e.document.uri.toString() === fileUri);
-                        const viewColumn = previousEditor?.viewColumn || vscode.ViewColumn.Beside;
-                        
-                        vscode.window.showTextDocument(
-                            vscode.Uri.parse(
-                                path.join(path.dirname(fileUri), href)
-                            ),
-                            {viewColumn}
-                        );
-                    }
-                    return;
-                }
-            }
+      } else {
+        const result = await convert({
+          command: converter.command[0],
+          filePath: document.uri.fsPath,
+          source: document.getText(),
         });
-    }
-
-    async init() {
-        if (!this.isActive) return;
-
-        const meta = {
-            features: this.config.previewFeatures,
-        };
-        const resources = this.resources;
-        const customCssHtml = resources.customCssUri == null ? '' : `<link rel="stylesheet" type="text/css" href="${resources.customCssUri.toString()}" />`;
-
-        this.panel.webview.html = `
-<!DOCTYPE html>
-<html>
-  <head>
-    <base href="" id="documentPreview-base" />
-
-    <meta name="documentPreview-input" content="${Buffer.from(JSON.stringify(meta)).toString('base64')}" />
-
-    <script src="${resources.mermaidBaseUri.toString()}/mermaid.min.js"></script>
-    <script type="text/javascript">mermaid.mermaidAPI.initialize({ startOnLoad:false, theme:'dark' });</script>
-    
-    <link rel="stylesheet" type="text/css" href="${resources.katexBaseUri.toString()}/katex.min.css" />
-    <script src="${resources.katexBaseUri.toString()}/katex.min.js" defer=""></script>
-    
-    <link rel="stylesheet" type="text/css" href="${resources.glightboxBaseUri.toString()}/css/glightbox.min.css" />
-    <script src="${resources.glightboxBaseUri.toString()}/js/glightbox.min.js" defer=""></script>
-    
-    <link rel="stylesheet" type="text/css" href="${resources.fontAwesomeBaseUri.toString()}/css/fontawesome.min.css" />
-    <link rel="stylesheet" type="text/css" href="${resources.fontAwesomeBaseUri.toString()}/css/regular.min.css" />
-    <link rel="stylesheet" type="text/css" href="${resources.fontAwesomeBaseUri.toString()}/css/solid.min.css" />
-    <link rel="stylesheet" type="text/css" href="${resources.fontAwesomeBaseUri.toString()}/css/brands.min.css" />
-    
-    ${customCssHtml}
-    <link rel="stylesheet" type="text/css" href="${resources.themeCssUri.toString()}" />
-    <link rel="stylesheet" type="text/css" href="${resources.highlightThemeCssUri.toString()}" />
-    <script src="${resources.jsUri}" defer=""></script>
-  </head>
-
-  <body class="documentPreview">
-  </body>
-</html>
-        `;
-    }
-
-    async render(document: vscode.TextDocument) {
-        if (this.converterMutex.isLocked()) {
-            const now = Date.now();
-            this.isDirty = true;
-            setTimeout(() => {
-                if (this.isDirty && now > this.lastConvertedAt) this.render(document);
-            }, 500);
-            return;
+        if (result.status === "ok") {
+          this.renderHtml(document.uri, baseUri, result.body);
+          this.isRendered = true;
+        } else {
+          console.error(result.message);
         }
-        this.converterMutex.runExclusive(async () => {
-            if (!this.isActive) return;
-            if (document.fileName != vscode.window.activeTextEditor?.document.fileName) return;
-            this.isDirty = false;
-            this.lastConvertedAt = Date.now();
-            const converter = this.getConverter(document);
-            if (converter == null || converter.command == null) return;
-            const result = await convert({command: converter.command, filePath: document.uri.fsPath, source: document.getText()});
-            if (result.status === "ok") {
-                const baseUri = this.panel.webview.asWebviewUri(document.uri);
-                this.renderHtml(document.uri, baseUri, result.body);
-            }
-            // TODO: error.
-        });
-    }
+      }
+      // TODO: error.
+    });
+  }
 
-    async renderHtml(fileUri: vscode.Uri, baseUri: vscode.Uri, body: string) {
-        await this.panel.webview.postMessage({ type: "render", body, fileUri: fileUri.toString(), baseUri: baseUri.toString() });
-    }
+  async renderHtml(fileUri: vscode.Uri, baseUri: vscode.Uri, html: string) {
+    const dom = new JSDOM(html);
+    const scriptElement = dom.window.document.createElement("script");
+    scriptElement.setAttribute("src", this.jsUri.toString());
+    scriptElement.setAttribute("defer", "true");
 
-    dispose() {
-        if (!this.isActive) return;
-        this.isActive = false;
-        this.panel.dispose();
-        this.disposables.forEach(d => d.dispose());
-    }
+    const baseElement = dom.window.document.createElement("base");
+    baseElement.id = "document-preview-base";
+    baseElement.setAttribute("href", baseUri.toString());
 
-    protected getConverter(document: vscode.TextDocument): any | null {
-        for (const converter of this.config.converters) {
-            if (converter.regex != null && !document.fileName.match(converter.regex)) {
-                continue;
-            }
-            if (converter.fileTypes != null && !converter.fileTypes.includes(document.languageId)) {
-                continue;
-            }
-            return converter;
-        }
-        return null;
-    }
+    dom.window.document.head.appendChild(scriptElement);
+    dom.window.document.head.appendChild(baseElement);
 
-    protected makeLocalResourceUri(resourcePath: string): vscode.Uri {
-        return this.panel.webview.asWebviewUri(vscode.Uri.file(
-            this.context.asAbsolutePath(resourcePath)
-        ));
-    }
+    this.panel.webview.html = dom.serialize();
 
-    protected makeNodeModulesResourceUri(resourcePath: string): vscode.Uri {
-        return this.makeLocalResourceUri(path.join('node_modules', resourcePath));
+    await this.panel.webview.postMessage({
+      command: "set-file-uri",
+      fileUri: fileUri.toString(),
+    });
+  }
+
+  async renderHtmlBody(fileUri: vscode.Uri, baseUri: vscode.Uri, html: string) {
+    await this.panel.webview.postMessage({
+      command: "render-body",
+      html,
+      fileUri: fileUri.toString(),
+      baseUri: baseUri.toString(),
+    });
+  }
+
+  dispose() {
+    if (!this.isActive) return;
+    this.isActive = false;
+    this.panel.dispose();
+    this.disposables.forEach((d) => d.dispose());
+  }
+
+  protected getConverter(document: vscode.TextDocument): any | null {
+    for (const converter of this.config.converters) {
+      if (converter.regex != null && !document.fileName.match(converter.regex)) {
+        continue;
+      }
+      if (converter.fileTypes != null && !converter.fileTypes.includes(document.languageId)) {
+        continue;
+      }
+      return converter;
     }
+    return null;
+  }
+
+  protected makeLocalResourceUri(resourcePath: string): vscode.Uri {
+    return this.panel.webview.asWebviewUri(vscode.Uri.file(this.context.asAbsolutePath(resourcePath)));
+  }
+
+  protected makeNodeModulesResourceUri(resourcePath: string): vscode.Uri {
+    return this.makeLocalResourceUri(path.join("node_modules", resourcePath));
+  }
 }

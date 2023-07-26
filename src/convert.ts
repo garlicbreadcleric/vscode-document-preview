@@ -18,7 +18,7 @@ export type ConvertResult = ConvertResultOk | ConvertResultError;
 
 export async function convert(input: ConvertInput): Promise<ConvertResult> {
     try {
-        const body = await execCmd(input.command, input.source, { cwd: path.dirname(input.filePath) });
+        const body = await execCmd(input.command, input.source, { cwd: path.dirname(input.filePath), maxBuffer: 10_000_000 });
         return { status: "ok", body };
     } catch (e: any) {
         return { status: "error", message: e.toString() };
