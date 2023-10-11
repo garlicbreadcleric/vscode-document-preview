@@ -56,6 +56,7 @@ window.addEventListener("message", (event) => {
       if (scrollPositions[currentUri] != null) {
         window.scroll(0, scrollPositions[currentUri]);
       }
+      window.dispatchEvent(new Event("load"));
       break;
   }
 });
